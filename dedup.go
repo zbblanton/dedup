@@ -14,12 +14,12 @@ import(
   "sort"
   "html/template"
 	"net/http"
-  "sync"
+  //"sync"
   "strconv"
   "flag"
 )
 
-var wg sync.WaitGroup
+//var wg sync.WaitGroup
 
 type Todo struct {
 	Task string
@@ -59,7 +59,7 @@ var dup_list []File_dup_element
 
 
 func scanner(root_path string){
-  defer wg.Done()
+  //defer wg.Done()
   if(root_path == "/proc" || root_path == "/dev" || root_path == "/boot"){
     fmt.Println("THIS WILL NOT SCAN PROC, DEV, or BOOT")
     return
@@ -91,8 +91,9 @@ func scanner(root_path string){
     }
 
     if(file.IsDir()){
-      wg.Add(1)
-      go scanner(current_file)
+      //wg.Add(1)
+      //go scanner(current_file)
+      scanner(current_file)
     } else{
       //file_count++;
       temp_struct := File_info{current_file, 0}
@@ -104,7 +105,7 @@ func scanner(root_path string){
 }
 
 func hasher() {
-  for i := 1; i < len(s); i++ {
+  for i := 0; i < len(s); i++ {
     f, err := os.Open(s[i].Path)
     if err != nil {
       /*
@@ -164,6 +165,10 @@ func compare_hashes(){
   for i := 1; i < len(s); i++ {
     if(s[i].hash == current_hash){
       temp_dup_files = append(temp_dup_files, s[i].Path)
+      //Add to dup list if this is last loop and temp has more than one file
+      if(i + 1 == len(s) && len(temp_dup_files) > 1){
+        dup_list = append(dup_list, File_dup_element{temp_dup_files, current_hash})
+      }
     } else if (len(temp_dup_files) > 1){
         dup_list = append(dup_list, File_dup_element{temp_dup_files, current_hash})
         current_hash = s[i].hash
@@ -223,9 +228,15 @@ func main() {
     fmt.Printf("Reading complete\n")
   } else {
     fmt.Printf("Scanning Files\n")
-    wg.Add(1)
+    //wg.Add(1)
+    //go scanner(flag.Args()[0])
     scanner(flag.Args()[0])
-    wg.Wait()
+    //wg.Wait()
+    for i := 0; i < len(s); i++ {
+      if(s[i].Path == "/home/zbblanton/testdup/testdup1"){
+        fmt.Printf("Found the file in scanner\n")
+      }
+    }
     fmt.Printf("Scan Complete\n")
     fmt.Printf("Hashing Files\n")
     hasher()
@@ -239,6 +250,7 @@ func main() {
         fmt.Println("File", j, ":", dup_list[i].Path[j])
       }
     }
+
     fmt.Printf("Scan Complete \n")
     if(*exportPtr != ""){
       write_file(*exportPtr)
