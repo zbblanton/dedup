@@ -4,6 +4,7 @@
     <!-- Required meta tags -->
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.6.4/angular.min.js"></script>
 
     <!-- Bootstrap CSS -->
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-alpha.6/css/bootstrap.min.css" integrity="sha384-rwoIResjU2yc3z8GV/NPeZWAv56rSmLldC3R/AZzGRnGxQQKnKkoFVhFQhNUwEyJ" crossorigin="anonymous">
@@ -25,41 +26,64 @@
 		  <a class="navbar-brand" href="#">Deduplication Engine</a>
 		</nav>
 
-    <div class="container">
+    <div class="container" ng-app="myApp" ng-controller="customersCtrl">
       <div class="row">
         <div class="col-md-12">
           <div class="ml-auto p-2">
-            <a href="test2?from=0&to=10" class="btn btn-secondary" role="button" aria-disabled="true">Prev</a>
-            <a href="test2?from=10&to=20" class="btn btn-secondary" role="button" aria-disabled="true">Next</a>
+            <button ng-click="get_prev()"class="btn btn-secondary" role="button" aria-disabled="true">Prev</button>
+            <button ng-click="get_next()"class="btn btn-secondary" role="button" aria-disabled="true">Next</button>
           </div>
         </div>
       </div>
       <div class="row">
         <div class="col-md-12">
-					{{range .Element}}
-						<ul class="list-group">
+						<ul class="list-group" ng-repeat="x in myData">
 							<li class="list-group-item">
-								File Hash: {{.Hash}}
+								File Hash: {{x.Hash}}
 								<div class="ml-auto p-2">
 									<button type="button" class="btn btn-info">Select All</button>
 									<button type="button" class="btn btn-danger">Delete Selected</button>
 								</div>
 							</li>
-							{{range .Path}}
-								<li class="list-group-item">
+								<li class="list-group-item" ng-repeat="y in x.Path">
 									<label class="custom-control custom-checkbox">
 									  <input type="checkbox" class="custom-control-input">
 									  <span class="custom-control-indicator"></span>
-									  <span class="custom-control-description">{{.}}</span>
+									  <span class="custom-control-description">{{y}}</span>
 									</label>
 								</li>
-							{{end}}
 						</ul>
-					{{end}}
         </div>
       </div>
     </div>
 
+    <script>
+      var app = angular.module('myApp', []);
+      app.controller('customersCtrl', function($scope, $http) {
+        var current_from = 0;
+        var current_to = 10;
+        var get_url = "http://104.236.33.156:8181/api/list/" + current_from + "/" + current_to;
+        $http.get(get_url).then(function (response) {
+            $scope.myData = response.data.List;
+        });
+        $scope.get_next = function() {
+          current_from+= 10;
+          current_to+= 10;
+          var get_url = "http://104.236.33.156:8181/api/list/" + current_from + "/" + current_to;
+          $http.get(get_url).then(function (response) {
+              $scope.myData = response.data.List;
+          });
+        }
+        $scope.get_prev = function() {
+          current_from-= 10;
+          current_to-= 10;
+          var get_url = "http://104.236.33.156:8181/api/list/" + current_from + "/" + current_to;
+          $http.get(get_url).then(function (response) {
+              $scope.myData = response.data.List;
+          });
+        }
+      });
+    </script>
 
     <!-- jQuery first, then Tether, then Bootstrap JS. -->
     <script src="https://code.jquery.com/jquery-3.1.1.slim.min.js" integrity="sha384-A7FZj7v+d/sdmMqp/nOQwliLvUsJfDHW+k9Omg/a/EheAdgtzNs3hpfag6Ed950n" crossorigin="anonymous"></script>

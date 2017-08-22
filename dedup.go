@@ -12,11 +12,13 @@ import(
   "github.com/OneOfOne/xxhash"
   "encoding/gob"
   "sort"
-  "html/template"
+  //"html/template"
 	"net/http"
   //"sync"
   "strconv"
   "flag"
+  "github.com/gorilla/mux"
+  "encoding/json"
 )
 
 //var wg sync.WaitGroup
@@ -26,6 +28,39 @@ type Todo struct {
 	Done bool
 }
 
+type Api_resp struct {
+  Success string
+  Errors string
+}
+
+type Api_list_resp struct {
+  List []File_dup_element
+  Success bool
+}
+
+type Api_delete_file struct {
+  Path string
+  Hash uint64
+}
+
+type Api_delete_req struct {
+  Files []Api_delete_file
+}
+
+type Api_delete_resp struct {
+  Failed_paths []string
+  Success bool
+}
+
+type Api_list_index_resp struct {
+  Index File_dup_element
+  Success bool
+}
+
+type Api_list_length_resp struct {
+  Length int
+  Success bool
+}
 
 type Fdup_list struct{
   Element []File_dup_element
@@ -207,6 +242,132 @@ func convert_to_map() {
   fmt.Println("Hello")
 }
 
+func api_list_length(w http.ResponseWriter, r *http.Request) {
+  w.Header().Set("Content-Type", "application/json")
+  w.Header().Set("Access-Control-Allow-Origin", "*")
+  data := Api_list_length_resp {
+    len(dup_list),
+    true,
+  }
+
+  json.NewEncoder(w).Encode(data)
+  defer r.Body.Close()
+}
+
+func api_list_index(w http.ResponseWriter, r *http.Request) {
+  w.Header().Set("Content-Type", "application/json")
+  w.Header().Set("Access-Control-Allow-Origin", "*")
+  vars := mux.Vars(r)
+
+  success := true
+  index, err := strconv.Atoi(vars["index"])
+  if err != nil {
+    success = false
+  }
+
+  if(index > len(dup_list) || index < 0){
+    success = false
+  }
+
+  var data Api_list_index_resp
+  if(success){
+    data = Api_list_index_resp {
+      dup_list[index],
+      true,
+    }
+  } else {
+    data.Success = false
+  }
+
+  json.NewEncoder(w).Encode(data)
+  defer r.Body.Close()
+}
+
+func api_list(w http.ResponseWriter, r *http.Request) {
+  w.Header().Set("Content-Type", "application/json")
+  w.Header().Set("Access-Control-Allow-Origin", "*")
+  vars := mux.Vars(r)
+
+  success := true
+  from, err := strconv.Atoi(vars["from"])
+  if err != nil {
+    success = false
+  }
+
+  to, err := strconv.Atoi(vars["to"])
+  if err != nil {
+    success = false
+  }
+
+  if(to <= from || to > len(dup_list) || from < 0){
+    success = false
+  }
+
+  var data Api_list_resp
+  if(success){
+    data = Api_list_resp {
+      dup_list[from:to],
+      true,
+    }
+  } else {
+    data.Success = false
+  }
+
+
+  json.NewEncoder(w).Encode(data)
+  defer r.Body.Close()
+}
+
+func api_delete(w http.ResponseWriter, r *http.Request) {
+  w.Header().Set("Content-Type", "application/json")
+  w.Header().Set("Access-Control-Allow-Origin", "*")
+  decoder := json.NewDecoder(r.Body)
+  var t Api_delete_req
+  err := decoder.Decode(&t)
+  if err != nil {
+      panic(err)
+  }
+
+  var failed_paths []string
+  for i := 0; i < len(t.Files); i++ {
+    for j := 0; j < len(dup_list); j++ {
+      for k := 0; k < len(dup_list[j].Path); k++ {
+        if(dup_list[j].Path[k] == t.Files[i].Path){
+          err := os.Remove(t.Files[i].Path)
+          if err != nil {
+            failed_paths = append(failed_paths, t.Files[i].Path)
+          }
+        }
+      }
+    }
+  }
+
+  var data Api_delete_resp
+  if(len(failed_paths) > 0){
+    data = Api_delete_resp {
+      failed_paths,
+      false,
+    }
+  } else {
+    data = Api_delete_resp {
+      failed_paths,
+      true,
+    }
+  }
+  json.NewEncoder(w).Encode(data)
+
+  defer r.Body.Close()
+}
+
+func api_index(w http.ResponseWriter, r *http.Request) {
+  //fmt.Println("Request:", r.URL.Path[1:])
+  //if r.URL.Path[1:] == "" {
+    http.ServeFile(w, r, "web/index.html")
+  //} else {
+    //http.ServeFile(w, r, "web/" + r.URL.Path[1:])
+  //}
+}
+
 func main() {
   //runtime.GOMAXPROCS(2)
 
@@ -260,50 +421,15 @@ func main() {
   if(*interfacePtr == "web"){
     fmt.Printf("Web Service Starting\n")
 
-    tmpl2 := template.Must(template.ParseFiles("web/files.html"))
+    router := mux.NewRouter().StrictSlash(true)
+    router.HandleFunc("/", api_index)
+    //router.HandleFunc("/api", TodoIndex)
+    router.HandleFunc("/api/delete", api_delete)
+    router.HandleFunc("/api/list/length", api_list_length)
+    router.HandleFunc("/api/list/{index}", api_list_index)
+    router.HandleFunc("/api/list/{from}/{to}", api_list)
 
-    http.HandleFunc("/test2", func(w http.ResponseWriter, r *http.Request) {
-      //data.Teststr = r.FormValue("name")
-      to := 0
-      from := 1
-      if(r.FormValue("from") != ""){
-        str_from, err := strconv.Atoi(r.FormValue("from"))
-        if err != nil {
-          //NEED TO ADD AN ERROR THAT WONT CRASH THE SERVER
-          log.Fatal(err)
-        }
-        from = str_from
-      }
-      if(r.FormValue("to") != ""){
-        str_to, err := strconv.Atoi(r.FormValue("to"))
-        if err != nil {
-          //NEED TO ADD AN ERROR THAT WONT CRASH THE SERVER
-          log.Fatal(err)
-        }
-        to = str_to
-      }
-
-      if(to <= from){
-        //NEED TO ADD AN ERROR THAT WONT CRASH THE SERVER
-        log.Fatal("From CANNOT be lower or equal to To.")
-      }
-      data := Fdup_list{
-        dup_list[from:to],
-        "test",
-      }
-      tmpl2.Execute(w, data)
-    })
-
-    http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-      fmt.Println("Request:", r.URL.Path[1:])
-      if r.URL.Path[1:] == "" {
-        http.ServeFile(w, r, "web/index.html")
-      } else {
-        http.ServeFile(w, r, "web/" + r.URL.Path[1:])
-      }
-    })
-
-    http.ListenAndServe(":8181", nil)
+    http.ListenAndServe(":8181", router)
   }
 
 
